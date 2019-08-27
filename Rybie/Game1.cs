@@ -58,21 +58,31 @@ namespace Rybie
         private int _fishesToCatch;
         private const string ToCatch = "Do zlapania: ";
         private const string Chances = "Szanse: ";
+        private const string PressSpace = "Wcisnij spacje zeby zaczac";
+        private const string Title = "Underwater Attack";
 
         #endregion
 
         private KeyboardState _previousState;
-
+        private bool _gameOver;
         private Random _random;
+
+        #region Level
 
         private int _level;
         private bool _levelTransition;
         private float _levelTransitionTimer;
         private float _levelTransitionDelay;
 
+        #endregion
+
+        #region Bubbles
+
         private Texture2D _bubbleTexture;
         private List<BackgroundBubble> _bubbles;
         private int _bubbleAmount;
+
+        #endregion
 
         public Game1()
         {
@@ -136,6 +146,7 @@ namespace Rybie
             _levelTransitionDelay = 1f;
 
             _bubbleAmount = 50;
+            _lives = 5;
 
             _previousState = Keyboard.GetState();
 
@@ -189,6 +200,8 @@ namespace Rybie
         {
             var elapsedTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
+            if (_lives < 1) _gameOver = true;
+
             if (_levelTransition)
             {
                 if (_levelTransitionTimer > _levelTransitionDelay)
@@ -202,7 +215,7 @@ namespace Rybie
 
             KeyboardHandler();
 
-            if (!_paused && !_levelTransition && _gameStarted)
+            if (!_paused && !_levelTransition && _gameStarted && !_gameOver)
             {
 
                 if (_gameStarted && _fishTimer > _fishSpawnDelay / Math.Sqrt(_level))
@@ -223,25 +236,28 @@ namespace Rybie
                 }
 
                 UpdateFish(elapsedTime);
-
-                foreach (var net in _nets.ToList())
-                {
-                    net.Update(elapsedTime);
-                    if (net.X > _screenWidth)
-                    {
-                        _nets.Remove(net);
-                    }
-
-                    if (net.Dead)
-                    {
-                        _nets.Remove(net);
-                    }
-                }
-
+                UpdateNets(elapsedTime);
                 _ship.Update(elapsedTime);
             }
 
             base.Update(gameTime);
+        }
+
+        private void UpdateNets(float elapsedTime)
+        {
+            foreach (var net in _nets.ToList())
+            {
+                net.Update(elapsedTime);
+                if (net.X > _screenWidth)
+                {
+                    _nets.Remove(net);
+                }
+
+                if (net.Dead)
+                {
+                    _nets.Remove(net);
+                }
+            }
         }
 
         private void UpdateFish(float elapsedTime)
@@ -328,6 +344,11 @@ namespace Rybie
                 DrawSplashScreen();
             }
 
+            if (_gameOver)
+            {
+                DrawGameOverScreen();
+            }
+
             if (_paused)
             {
                 var pause = "Pauza";
@@ -360,21 +381,32 @@ namespace Rybie
             _spriteBatch.DrawString(_stateFont, getReady, new Vector2(_screenWidth / 2 - getReadySize.X / 2, _screenHeight / 2 - (getReadySize.Y / 3) + 50), Color.White, 0f, new Vector2(0, 0), 1f, SpriteEffects.None, 1f);
         }
 
+        private void DrawGameOverScreen()
+        {
+            _spriteBatch.Draw(_splashScreen, new Rectangle(0, 0, _screenWidth, _screenHeight), Color.White);
+
+            var gameOver = "Game Over";
+
+            var gameOverSize = _stateFont.MeasureString(gameOver);
+            var pressSize = _stateFont.MeasureString(PressSpace);
+
+            var pressScale = _screenWidth * 0.8f / pressSize.X;
+
+            _spriteBatch.DrawString(_stateFont, gameOver, new Vector2(_screenWidth / 2 - (gameOverSize.X) / 2, _screenHeight / 3), Color.DarkSeaGreen, 0f, new Vector2(0, 0), 1f, SpriteEffects.None, 1f);
+            _spriteBatch.DrawString(_stateFont, PressSpace, new Vector2(_screenWidth / 2 - (pressSize.X / 2 * pressScale), (_screenHeight / 2 - (pressSize.Y / 3 * pressScale)) + 50), Color.White, 0f, new Vector2(0, 0), pressScale, SpriteEffects.None, 1f);
+        }
+
         private void DrawSplashScreen()
         {
             _spriteBatch.Draw(_splashScreen, new Rectangle(0, 0, _screenWidth, _screenHeight), Color.White);
 
-            const string title = "Underwater Attack";
-            const string pressSpace = "Wcisnij spacje zaby zaczac";
+            var titleSize = _stateFont.MeasureString(Title);
+            var pressSize = _stateFont.MeasureString(PressSpace);
 
-            var titleSize = _stateFont.MeasureString(title);
-            var pressSize = _stateFont.MeasureString(pressSpace);
-
-            var titleScale = _screenWidth * 0.8f / titleSize.X;
             var pressScale = _screenWidth * 0.8f / pressSize.X;
 
-            _spriteBatch.DrawString(_stateFont, title, new Vector2(_screenWidth / 2 - (titleSize.X * titleScale) / 2, _screenHeight / 3), Color.DarkSeaGreen, 0f, new Vector2(0, 0), titleScale, SpriteEffects.None, 1f);
-            _spriteBatch.DrawString(_stateFont, pressSpace, new Vector2(_screenWidth / 2 - (pressSize.X / 2 * pressScale), (_screenHeight / 2 - (pressSize.Y / 3 * pressScale)) + 50), Color.White, 0f, new Vector2(0, 0), pressScale, SpriteEffects.None, 1f);
+            _spriteBatch.DrawString(_stateFont, Title, new Vector2(_screenWidth / 2 - titleSize.X / 2, _screenHeight / 3), Color.DarkSeaGreen, 0f, new Vector2(0, 0), 1f, SpriteEffects.None, 1f);
+            _spriteBatch.DrawString(_stateFont, PressSpace, new Vector2(_screenWidth / 2 - pressSize.X / 2 * pressScale, (_screenHeight / 2 - pressSize.Y / 3 * pressScale) + 50), Color.White, 0f, new Vector2(0, 0), pressScale, SpriteEffects.None, 1f);
         }
 
         private void DrawUI()
@@ -455,6 +487,16 @@ namespace Rybie
                 return;
             }
 
+            if (_gameOver)
+            {
+                if (state.IsKeyDown(Keys.Space))
+                {
+                    StartGame();
+                    _gameOver = false;
+                }
+                return;
+            }
+
             if ((state.IsKeyDown(Keys.Up) || state.IsKeyDown(Keys.W)) && _ship.Y > 75 + _ship.Texture.Height)
             {
                 _ship.dY = _shipSpeed * -1;
@@ -525,6 +567,9 @@ namespace Rybie
 
         private void StartGame()
         {
+            _nets.Clear();
+            _fishes.Clear();
+
             _bubbles = GenerateBackgroundBubbles();
             _ship.Y = _screenHeight / 2;
             _ship.X = (_ship.Texture.Width / 2) + 10;
@@ -532,6 +577,7 @@ namespace Rybie
             _lives = 5;
             _fishesToCatch = 3 + _level;
             _score = 0;
+            _gameOver = false;
         }
 
         private List<BackgroundBubble> GenerateBackgroundBubbles()
