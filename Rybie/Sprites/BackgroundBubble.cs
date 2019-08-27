@@ -12,5 +12,11 @@ namespace Rybie.Sprites
         public BackgroundBubble(Texture2D texture, float scale) : base(texture, scale)
         {
         }
+
+        public new void Update(float elapsedTime)
+        {
+
+            base.Update(elapsedTime);
+        }
     }
 }

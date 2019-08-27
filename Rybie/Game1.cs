@@ -70,6 +70,10 @@ namespace Rybie
         private float _levelTransitionTimer;
         private float _levelTransitionDelay;
 
+        private Texture2D _bubbleTexture;
+        private List<BackgroundBubble> _bubbles;
+        private int _bubbleAmount;
+
         public Game1()
         {
             //Minimal resolution of the game is 1024x576
@@ -131,6 +135,8 @@ namespace Rybie
 
             _levelTransitionDelay = 1f;
 
+            _bubbleAmount = 50;
+
             _previousState = Keyboard.GetState();
 
             _random = new Random();
@@ -154,6 +160,7 @@ namespace Rybie
             _ship = new SpriteBase(GraphicsDevice, @"Content/okrecik.png", 0.8f);
 
             _netTexture = Content.Load<Texture2D>("siata");
+            _bubbleTexture = Content.Load<Texture2D>("Bubble");
 
             _uiFont = Content.Load<SpriteFont>("Lives");
             _stateFont = Content.Load<SpriteFont>("State");
@@ -194,7 +201,8 @@ namespace Rybie
             }
 
             KeyboardHandler();
-            if (!_paused && !_levelTransition)
+
+            if (!_paused && !_levelTransition && _gameStarted)
             {
 
                 if (_gameStarted && _fishTimer > _fishSpawnDelay / Math.Sqrt(_level))
@@ -205,38 +213,16 @@ namespace Rybie
 
                 _fishTimer += elapsedTime;
 
-                foreach (var fish in _fishes.ToList())
+                foreach (var backgroundBubble in _bubbles)
                 {
-                    fish.Update(elapsedTime);
-                    if (fish.X < -10)
+                    backgroundBubble.Update(elapsedTime);
+                    if (backgroundBubble.X < 0)
                     {
-                        _fishes.Remove(fish);
-                        if(fish.IsCorrect) _lives -= 1;
-                    }
-
-                    if (_nets.Any(c => c.RectangleCollision(fish)))
-                    {
-                        if (fish.IsCorrect)
-                        {
-                            _score += 100 + (int)(fish.X / 2);
-                            _fishesToCatch--;
-                            if (_fishesToCatch == 0)
-                            {
-                                LevelUp();
-                            }
-                        }
-                        else
-                        {
-                            _score -= 100;
-                            _lives--;
-                        }
-                    }
-
-                    if (fish.Dead)
-                    {
-                        _fishes.Remove(fish);
+                        backgroundBubble.X = _screenWidth;
                     }
                 }
+
+                UpdateFish(elapsedTime);
 
                 foreach (var net in _nets.ToList())
                 {
@@ -258,6 +244,47 @@ namespace Rybie
             base.Update(gameTime);
         }
 
+        private void UpdateFish(float elapsedTime)
+        {
+            foreach (var fish in _fishes.ToList())
+            {
+                fish.Update(elapsedTime);
+                if (fish.X < -10)
+                {
+                    _fishes.Remove(fish);
+                    if (fish.IsCorrect) _lives -= 1;
+                }
+
+                CheckCollision(fish);
+
+                if (fish.Dead)
+                {
+                    _fishes.Remove(fish);
+                }
+            }
+        }
+
+        private void CheckCollision(Fish fish)
+        {
+            if (_nets.Any(c => c.RectangleCollision(fish)))
+            {
+                if (fish.IsCorrect)
+                {
+                    _score += 100 + (int)(fish.X / 2);
+                    _fishesToCatch--;
+                    if (_fishesToCatch == 0)
+                    {
+                        LevelUp();
+                    }
+                }
+                else
+                {
+                    _score -= 100;
+                    _lives--;
+                }
+            }
+        }
+
         private void LevelUp()
         {
             _levelTransition = true;
@@ -273,11 +300,15 @@ namespace Rybie
         protected override void Draw(GameTime gameTime)
         {
             GraphicsDevice.Clear(Color.LightSeaGreen);
-            if (!_levelTransition || !_paused)
+            _spriteBatch.Begin();
+            if ((!_levelTransition || !_paused) && _gameStarted)
             {
-                _spriteBatch.Begin();
-
                 _ship.Draw(_spriteBatch);
+
+                foreach (var backgroundBubble in _bubbles)
+                {
+                    backgroundBubble.Draw(_spriteBatch);
+                }
 
                 foreach (var fish in _fishes)
                 {
@@ -290,11 +321,11 @@ namespace Rybie
                 }
 
                 DrawUI();
+            }
 
-                if (!_gameStarted)
-                {
-                    DrawSplashScreen();
-                }
+            if (!_gameStarted)
+            {
+                DrawSplashScreen();
             }
 
             if (_paused)
@@ -494,6 +525,7 @@ namespace Rybie
 
         private void StartGame()
         {
+            _bubbles = GenerateBackgroundBubbles();
             _ship.Y = _screenHeight / 2;
             _ship.X = (_ship.Texture.Width / 2) + 10;
             _level = 1;
@@ -501,5 +533,22 @@ namespace Rybie
             _fishesToCatch = 3 + _level;
             _score = 0;
         }
+
+        private List<BackgroundBubble> GenerateBackgroundBubbles()
+        {
+            var bubbles = new List<BackgroundBubble>();
+
+            for (var i = 0; i < _bubbleAmount; i++)
+            {
+                var scale = _random.Next(3, 10) / 10f;
+                var bubbleX = _random.Next(_screenWidth);
+                var bubbleY = _random.Next(100, _screenHeight);
+                var bubble = new BackgroundBubble(_bubbleTexture, scale) {X = bubbleX, Y = bubbleY, dX = (-80f) * (float)Math.Pow(scale * 2,2)};
+                bubbles.Add(bubble);
+            }
+
+            return bubbles;
+        }
+
     }
 }
